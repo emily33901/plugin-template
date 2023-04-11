@@ -1,0 +1,60 @@
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "main"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Submodules Recursive
+        run: |
+          git submodule update --init --recursive
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ${{ env.HOME }}/.cargo/bin/
+            ${{ env.HOME }}/.cargo/registry/index/
+            ${{ env.HOME }}/.cargo/registry/cache/
+            ${{ env.HOME }}/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Stable with rustfmt and clippy
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Check format
+        run: cargo fmt -- --check
+
+      - name: Release build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --all-features
+
+      - name: Rename DLL
+        run: |
+          mv target/release/emilydotgg_template.dll target/release/emilydotgg-template_x64.dll;
+          mv target/release/emilydotgg_template.pdb target/release/emilydotgg-template_x64.pdb
+
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: emilydotgg-template
+          path: |
+            target/release/emilydotgg-template_x64.dll
+            target/release/emilydotgg-template_x64.pdb
+          if-no-files-found: error
